@@ -4,10 +4,13 @@ from groq import Groq
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from preprocess import Preprocess
-from text_extraction import Extract
+from .preprocess import Preprocess
+from .text_extraction import Extract
 import cv2
 import numpy as np
+from PIL import Image
+import io
+from transformers import pipeline
 
 # PATH = r"D:\Projects\Python Projects\CertiScan\Dataset\Screenshot 2026-09-17 064156.png"
 # processed = Preprocess().fix_image(PATH)
@@ -44,10 +47,16 @@ app.add_middleware(
     allow_origins=["*"]
 )
 
+detector = pipeline("image-classification", model = "umm-maybe/AI-Image-detector")
 @app.post("/")
 async def home(file: UploadFile = File(...), document_type: str = Form(...)):
-    
     content = await file.read()
+    pil_image = Image.open(io.BytesIO(content)).convert("RGB")
+    prediction = detector(pil_image)
+    is_ai = any(p["label"].lower() in ["artificial", "ai", "generated", "fake"] and p["score"] > 0.85 for p in prediction)
+    if is_ai:
+        return {"message": "REJECTED", "result": True}
+    
     nparr = np.frombuffer(content, np.uint8)
     image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
