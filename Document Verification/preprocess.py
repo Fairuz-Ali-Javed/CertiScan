@@ -1,23 +1,37 @@
 import cv2
+import numpy as np
 
 class Preprocess:
-    def fix_image(self, PATH, debug = False):
-        img = cv2.imread(PATH) # get the image
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # grayscale conversion
-        blurred = cv2.GaussianBlur(gray, (3, 3), 0) # smoothing the image
-        # img = cv2.resize(img, (660,650))
-        # _, result = cv2.threshold(img, 20, 255, cv2.THRESH_BINARY)
+    def fix_image(self, image_input, debug=False):
+        if isinstance(image_input, str):
+            img = cv2.imread(image_input)  #if its a file path
+        elif isinstance(image_input, np.ndarray):
+            img = image_input  #if its a numpy array
 
-        adaptive = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 41, 5) # fixing the lighting
+        height, width = img.shape[:2]
+        img = cv2.resize(img, (width * 2, height * 2), interpolation=cv2.INTER_CUBIC)        
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) 
+        
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)        
+        thresh = cv2.adaptiveThreshold(
+            enhanced, 255, 
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            cv2.THRESH_BINARY_INV, 
+            15, 5
+        )        
+        horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 1))
+        detected_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=1)
+        text_only_thresh = cv2.subtract(thresh, detected_lines)        
+        processed = cv2.bitwise_not(text_only_thresh)
 
         if debug:
-            # cv2.imshow("original", img)
-            cv2.imshow("show", adaptive)
+            cv2.imshow("show", processed)
             cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
-        return adaptive
+        return processed
 
 if __name__ == "__main__":
-    PATH = input("File Path:")
-    Preprocess().fix_image(PATH, debug = True)
-    
+    PATH = input("File Path: ")
+    Preprocess().fix_image(PATH, debug=True)

@@ -9,9 +9,7 @@ pyt.pytesseract.tesseract_cmd = os.getenv("PYTESSERACT_PATH")
 class Extract:
     def text_extraction(self, IMAGE):
         # img = cv2.imread(PATH)
-
         text = pyt.image_to_string(IMAGE)
-
         return text
         
 
